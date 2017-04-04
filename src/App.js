@@ -227,7 +227,7 @@ class App extends Component {
   calculatePathLength(path) {
     let length = 0;
     let findVertexById = id => v => v.id === id;
-    let lastVertex = this.state.vertices.find(findVertexById(0));
+    let lastVertex = this.state.vertices.find(findVertexById(path[0]));
     for(let i = 1; i < path.length; i++) {
       let vertex = this.state.vertices.find(findVertexById(path[i]));
       length += this.getDistance(lastVertex, vertex);
