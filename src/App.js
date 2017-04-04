@@ -25,6 +25,7 @@ class App extends Component {
     this.getMouseCoords = this.getMouseCoords.bind(this);
     this.shortestPath = this.shortestPath.bind(this);
     this.shortestPathRecursive = this.shortestPathRecursive.bind(this);
+    this.shortestPathOverall = this.shortestPathOverall.bind(this);
     this.calculatePathLength = this.calculatePathLength.bind(this);
   }
 
@@ -151,10 +152,19 @@ class App extends Component {
     return { x, y };
   }
 
-  shortestPath() {
-    let path = JSON.parse(JSON.stringify(this.state.path));
-    if(path.length === 0) {
-      path.push(0);
+  shortestPathOverall() {
+    this.shortestPath(true);
+  }
+
+  shortestPath(startOver = false) {
+    let path;
+    if(startOver === true) {
+      path = [0];
+    } else {
+      path = JSON.parse(JSON.stringify(this.state.path));
+      if(path.length === 0) {
+        path.push(0);
+      }
     }
     let remainingVertices = this.state.vertices.filter(v => path.find(id => id === v.id) === undefined);
     // while(remainingVertices.length > 0) {
@@ -173,19 +183,18 @@ class App extends Component {
     //   remainingVertices.splice(remainingVertices.findIndex(v => v.id === currentClosestVertex.id), 1);
     // }
     // console.log(path);
-    let shortestPath = this.shortestPathRecursive(path, remainingVertices, this.calculatePathLength(path));
+    let shortestPath = this.shortestPathRecursive(path, remainingVertices, remainingVertices.length > 0 ? this.calculatePathLength(path) : this.calculateLoopPathLength(path));
     console.log(shortestPath);
-    console.log('shortest path length: ' + this.calculatePathLength(shortestPath.path));
-    console.log('selected path length: ' + this.calculatePathLength(this.state.path));
+    console.log('shortest path length: ' + this.calculateLoopPathLength(shortestPath.path));
+    console.log('selected path length: ' + this.calculateLoopPathLength(this.state.path));
   }
-
-  // 4-7-9-0-1-3
-  // 4 7 9 0 1 3 2
 
   shortestPathRecursive(path, remainingVertices, length, initial = true) {
     if(remainingVertices.length === 1) {
+      let distanceToLastVertex = this.getDistance(this.state.vertices.find(v => v.id === path[path.length - 1]), remainingVertices[0]);
+      let distanceToOrigin = this.getDistance(remainingVertices[0], this.state.vertices.find(v => v.id === path[0]));
       return {
-        length: this.getDistance(this.state.vertices.find(v => v.id === path[path.length - 1]), remainingVertices[0]),
+        length: distanceToLastVertex + distanceToOrigin + (initial ? length : 0),
         path: path.concat(remainingVertices[0].id)
       };
     } else if(remainingVertices.length < 1) {
@@ -227,6 +236,16 @@ class App extends Component {
     return length;
   }
 
+  calculateLoopPathLength(path) {
+    let firstVertex = this.state.vertices.find(v => v.id === path[0]);
+    let lastVertex = this.state.vertices.find(v => v.id === path[path.length - 1]);
+    if(path.length >= 2) {
+      return this.calculatePathLength(path) + this.getDistance(firstVertex, lastVertex);
+    } else {
+      return 0;
+    }
+  }
+
   reset() {
     this.setState({ vertices: this.generateNewVertices(this.NUM_VERTICES), path: [] });
   }
@@ -257,7 +276,8 @@ class App extends Component {
           <canvas id="canvas" ref={ref => this.canvas = ref} onMouseMove={this.handleMouseMove} onClick={this.handleMouseClick} />
           <div className="button-container">
             <button onClick={this.reset}>Reset</button>
-            <button onClick={this.shortestPath}>Shortest Path</button>
+            <button onClick={this.shortestPath}>Shortest Path From Here</button>
+            <button onClick={this.shortestPathOverall}>Shortest Path Overall</button>
           </div>
         </div>
       </div>
