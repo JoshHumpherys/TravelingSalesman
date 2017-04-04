@@ -1,5 +1,4 @@
 import React, { Component } from 'react';
-// import graph from './graph.png';
 import './App.css';
 
 class App extends Component {
@@ -17,12 +16,20 @@ class App extends Component {
     this.VERTEX_HOVER_COLOR = '#f00';
     this.VERTEX_SELECTED_COLOR = '#00f';
 
+    this.getDistance = this.getDistance.bind(this);
     this.generateNewVertices = this.generateNewVertices.bind(this);
     this.renderCanvas = this.renderCanvas.bind(this);
     this.reset = this.reset.bind(this);
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleMouseClick = this.handleMouseClick.bind(this);
     this.getMouseCoords = this.getMouseCoords.bind(this);
+    this.shortestPath = this.shortestPath.bind(this);
+    this.shortestPathRecursive = this.shortestPathRecursive.bind(this);
+    this.calculatePathLength = this.calculatePathLength.bind(this);
+  }
+
+  getDistance(p1, p2) {
+    return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
   }
 
   generateNewVertices(n) {
@@ -39,7 +46,7 @@ class App extends Component {
         newPoint = generateNewPoint();
         let invalid = false;
         for(let v of vertices) {
-          if(Math.sqrt(Math.pow(newPoint.x - v.x, 2) + Math.pow(newPoint.y - v.y, 2)) < .2) {
+          if(this.getDistance(newPoint, v) < .2) {
             invalid = true;
             break;
           }
@@ -102,13 +109,16 @@ class App extends Component {
       c.arc(v.x * width, v.y * height, this.RADIUS, 0, Math.PI * 2, true);
       c.fill();
       c.stroke();
+      c.font = '20px serif';
+      // c.strokeText(v.id, v.x * width - 5, v.y * height + 7);
+      c.strokeText(v.id, v.x * width - 5, v.y * height - 13);
     }
   }
 
   handleMouseMove(e) {
-    let { x, y } = this.getMouseCoords(e);
+    let mouseCoords = this.getMouseCoords(e);
     let vertices = this.state.vertices.map(v => {
-      v.hover = Math.sqrt(Math.pow(x - v.x * this.state.canvasWidth, 2) + Math.pow(y - v.y * this.state.canvasHeight, 2)) < this.RADIUS;
+      v.hover = this.getDistance(mouseCoords, { x: v.x * this.state.canvasWidth, y: v.y * this.state.canvasHeight }) < this.RADIUS;
       return v;
     });
     this.setState({ vertices });
@@ -126,7 +136,11 @@ class App extends Component {
     });
     if(selectedId !== -1) {
       let path = this.state.path.concat(selectedId);
-      this.setState({ vertices, path });
+      this.setState({ vertices, path }, () => {
+        if(path.length === this.NUM_VERTICES) {
+          this.shortestPath();
+        }
+      });
     }
   }
 
@@ -135,6 +149,82 @@ class App extends Component {
     let x = e.clientX - bounds.left;
     let y = e.clientY - bounds.top;
     return { x, y };
+  }
+
+  shortestPath() {
+    let path = JSON.parse(JSON.stringify(this.state.path));
+    if(path.length === 0) {
+      path.push(0);
+    }
+    let remainingVertices = this.state.vertices.filter(v => path.find(id => id === v.id) === undefined);
+    // while(remainingVertices.length > 0) {
+    //   let lastVertex = getVertexFromVertexId(path[path.length - 1]);
+    //   let currentClosestVertex = remainingVertices[0];
+    //   let currentClosestVertexDistance = this.getDistance(lastVertex, currentClosestVertex);
+    //   for(let i = 1; i < remainingVertices.length; i++) {
+    //     let currentVertex = remainingVertices[i];
+    //     let currentVertexDistance = this.getDistance(lastVertex, currentVertex);
+    //     if(currentVertexDistance < currentClosestVertexDistance) {
+    //       currentClosestVertex = currentVertex;
+    //       currentClosestVertexDistance = currentVertexDistance;
+    //     }
+    //   }
+    //   path.push(currentClosestVertex.id);
+    //   remainingVertices.splice(remainingVertices.findIndex(v => v.id === currentClosestVertex.id), 1);
+    // }
+    // console.log(path);
+    let shortestPath = this.shortestPathRecursive(path, remainingVertices, this.calculatePathLength(path));
+    console.log(shortestPath);
+    console.log('shortest path length: ' + this.calculatePathLength(shortestPath.path));
+    console.log('selected path length: ' + this.calculatePathLength(this.state.path));
+  }
+
+  // 4-7-9-0-1-3
+  // 4 7 9 0 1 3 2
+
+  shortestPathRecursive(path, remainingVertices, length, initial = true) {
+    if(remainingVertices.length === 1) {
+      return {
+        length: this.getDistance(this.state.vertices.find(v => v.id === path[path.length - 1]), remainingVertices[0]),
+        path: path.concat(remainingVertices[0].id)
+      };
+    } else if(remainingVertices.length < 1) {
+      return { length, path };
+    }
+    let lastVertex = this.state.vertices.find(v => v.id === path[path.length - 1]);
+    let currentBestOption = remainingVertices[0];
+    let newPath = path.concat(currentBestOption.id);
+    let newRemainingVertices = remainingVertices.filter(v => v.id !== currentBestOption.id);
+    let currentBestOptionDistance = this.getDistance(lastVertex, currentBestOption);
+    let currentBestOptionShorestPath = this.shortestPathRecursive(newPath, newRemainingVertices, length + currentBestOptionDistance, false);
+    for(let i = 1; i < remainingVertices.length; i++) {
+      let currentOption = remainingVertices[i];
+      newPath = path.concat(currentOption.id);
+      newRemainingVertices = remainingVertices.filter(v => v.id !== currentOption.id);
+      let currentOptionDistance = this.getDistance(lastVertex, currentOption);
+      let currentOptionShortestPath = this.shortestPathRecursive(newPath, newRemainingVertices, length + currentOptionDistance, false);
+      if(currentOptionShortestPath.length + currentOptionDistance < currentBestOptionShorestPath.length + currentBestOptionDistance) {
+        currentBestOption = currentOption;
+        currentBestOptionShorestPath = currentOptionShortestPath;
+        currentBestOptionDistance = currentOptionDistance;
+      }
+    }
+    return {
+      length: currentBestOptionShorestPath.length + currentBestOptionDistance + (initial ? length : 0),
+      path: currentBestOptionShorestPath.path
+    };
+  }
+
+  calculatePathLength(path) {
+    let length = 0;
+    let findVertexById = id => v => v.id === id;
+    let lastVertex = this.state.vertices.find(findVertexById(0));
+    for(let i = 1; i < path.length; i++) {
+      let vertex = this.state.vertices.find(findVertexById(path[i]));
+      length += this.getDistance(lastVertex, vertex);
+      lastVertex = vertex;
+    }
+    return length;
   }
 
   reset() {
@@ -158,7 +248,6 @@ class App extends Component {
     return (
       <div className="app">
         <div className="app-header">
-          {/*<img src={graph} className="App-logo" alt="graph" />*/}
           <h2>Traveling Salesman Problem Visualization</h2>
         </div>
         <div className="container">
@@ -168,7 +257,7 @@ class App extends Component {
           <canvas id="canvas" ref={ref => this.canvas = ref} onMouseMove={this.handleMouseMove} onClick={this.handleMouseClick} />
           <div className="button-container">
             <button onClick={this.reset}>Reset</button>
-            <button>Shortest Path</button>
+            <button onClick={this.shortestPath}>Shortest Path</button>
           </div>
         </div>
       </div>
