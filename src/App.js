@@ -7,7 +7,8 @@ class App extends Component {
 
     this.state = {
       vertices: [],
-      path: []
+      path: [],
+      showShortestPath: false
     };
 
     this.NUM_VERTICES = 10;
@@ -20,6 +21,7 @@ class App extends Component {
     this.generateNewVertices = this.generateNewVertices.bind(this);
     this.renderCanvas = this.renderCanvas.bind(this);
     this.reset = this.reset.bind(this);
+    this.addVertexGreedily = this.addVertexGreedily.bind(this);
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleMouseClick = this.handleMouseClick.bind(this);
     this.getMouseCoords = this.getMouseCoords.bind(this);
@@ -28,6 +30,7 @@ class App extends Component {
     this.shortestPathOverall = this.shortestPathOverall.bind(this);
     this.calculatePathLength = this.calculatePathLength.bind(this);
     this.pathContainedWithin = this.pathContainedWithin.bind(this);
+    this.setShowShortestPath = this.setShowShortestPath.bind(this);
   }
 
   getDistance(p1, p2) {
@@ -103,9 +106,9 @@ class App extends Component {
     }
 
     // draw shortest path
-    if(this.state.shortestPathOverall && this.state.path.length === this.NUM_VERTICES) {
+    if(this.state.shortestPathOverall && this.state.showShortestPath) {
       c.strokeStyle = '#0f0';
-      drawPath(this.state.shortestPathOverall.path, 5);
+      drawPath(this.state.shortestPathOverall.path, 3);
     }
 
     // draw vertices
@@ -171,6 +174,51 @@ class App extends Component {
     return { x, y };
   }
 
+  addVertexGreedily() {
+    let path = JSON.parse(JSON.stringify(this.state.path));
+    if(path.length === 0) {
+      path.push(0);
+      let vertices = this.state.vertices.map(v => {
+        if(v.id === 0) {
+          v.selected = true;
+        }
+        return v;
+      });
+      this.setState({ path, vertices });
+    }
+    let remainingVertices = this.state.vertices.filter(v => path.find(id => id === v.id) === undefined);
+    if(remainingVertices.length > 0) {
+      let lastVertex = this.state.vertices.find(v => v.id === path[path.length - 1]);
+      let currentClosestVertex = remainingVertices[0];
+      let currentClosestVertexDistance = this.getDistance(lastVertex, currentClosestVertex);
+      for(let i = 1; i < remainingVertices.length; i++) {
+        let currentVertex = remainingVertices[i];
+        let currentVertexDistance = this.getDistance(lastVertex, currentVertex);
+        if(currentVertexDistance < currentClosestVertexDistance) {
+          currentClosestVertex = currentVertex;
+          currentClosestVertexDistance = currentVertexDistance;
+        }
+      }
+      path.push(currentClosestVertex.id);
+      // remainingVertices.splice(remainingVertices.findIndex(v => v.id === currentClosestVertex.id), 1);
+      let vertices = this.state.vertices.map(v => {
+        if(v.id === currentClosestVertex.id) {
+          v.selected = true;
+        }
+        return v;
+      });
+      let shortestPathFromHere = this.state.shortestPathFromHere;
+      if(shortestPathFromHere !== undefined && !this.pathContainedWithin(path, this.state.shortestPathFromHere.path)) {
+        shortestPathFromHere = undefined;
+      }
+      this.setState({ vertices, path, shortestPathFromHere }, () => {
+        if(shortestPathFromHere === undefined) {
+          this.shortestPath();
+        }
+      });
+    }
+  }
+
   shortestPathOverall() {
     this.shortestPath(true);
   }
@@ -187,22 +235,6 @@ class App extends Component {
       }
     }
     let remainingVertices = this.state.vertices.filter(v => path.find(id => id === v.id) === undefined);
-    // while(remainingVertices.length > 0) {
-    //   let lastVertex = getVertexFromVertexId(path[path.length - 1]);
-    //   let currentClosestVertex = remainingVertices[0];
-    //   let currentClosestVertexDistance = this.getDistance(lastVertex, currentClosestVertex);
-    //   for(let i = 1; i < remainingVertices.length; i++) {
-    //     let currentVertex = remainingVertices[i];
-    //     let currentVertexDistance = this.getDistance(lastVertex, currentVertex);
-    //     if(currentVertexDistance < currentClosestVertexDistance) {
-    //       currentClosestVertex = currentVertex;
-    //       currentClosestVertexDistance = currentVertexDistance;
-    //     }
-    //   }
-    //   path.push(currentClosestVertex.id);
-    //   remainingVertices.splice(remainingVertices.findIndex(v => v.id === currentClosestVertex.id), 1);
-    // }
-    // console.log(path);
     let shortestPath = this.shortestPathRecursive(path, remainingVertices, remainingVertices.length > 0 ? this.calculatePathLength(path) : this.calculateLoopPathLength(path));
     if(startOver === true) {
       this.setState({ shortestPathOverall: shortestPath }, this.shortestPath);
@@ -286,8 +318,13 @@ class App extends Component {
       vertices: this.generateNewVertices(this.NUM_VERTICES),
       path: [],
       shortestPathFromHere: undefined,
-      shortestPathOverall: undefined
+      shortestPathOverall: undefined,
+      showShortestPath: false
     }, this.shortestPathOverall);
+  }
+
+  setShowShortestPath() {
+    this.setState({ showShortestPath: !this.state.showShortestPath });
   }
 
   componentWillMount() {
@@ -319,13 +356,24 @@ class App extends Component {
           <canvas id="canvas" ref={ref => this.canvas = ref} onMouseMove={this.handleMouseMove} onClick={this.handleMouseClick} />
           <div className="button-container">
             <div>
-              <button onClick={this.reset}>Reset</button>
-            </div>
-            <div>
               {this.state.shortestPathOverall ? 'Shortest path overall: ' + Math.floor(this.state.shortestPathOverall.length * 100) / 100 : ''}
             </div>
             <div>
               {this.state.shortestPathFromHere ? 'Shortest path from here: ' + (Math.floor(this.state.shortestPathFromHere.length * 100) / 100) + ' (' + calculateError(this.state.shortestPathOverall.length, this.state.shortestPathFromHere.length) + '% error)' : ''}
+            </div>
+          </div>
+          <div className="button-container">
+            <div>
+              <button onClick={this.reset}>Reset</button>
+            </div>
+            <div>
+              <button onClick={this.addVertexGreedily}>Greedy</button>
+            </div>
+          </div>
+          <div className="button-container">
+            <div>
+              <input type="checkbox" checked={this.state.showShortestPath} onClick={e => this.setShowShortestPath(e.target.value)} />
+              <span>Show shortest path</span>
             </div>
           </div>
         </div>
