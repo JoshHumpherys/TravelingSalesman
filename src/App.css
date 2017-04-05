@@ -42,8 +42,16 @@
   flex-direction: row;
 }
 
-.button-container > button {
+.button-container > div {
   flex: 1;
   margin: 10px;
   height: 50px;
+}
+
+.button-container > div > button {
+  width: 100%;
+}
+
+.button-container > div > * {
+  margin-bottom: 10px;
 }
