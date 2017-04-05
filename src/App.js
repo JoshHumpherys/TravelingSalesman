@@ -16,6 +16,7 @@ class App extends Component {
     this.VERTEX_COLOR = '#0f0';
     this.VERTEX_HOVER_COLOR = '#f00';
     this.VERTEX_SELECTED_COLOR = '#00f';
+    this.HEIGHT_TO_WIDTH_RATIO = 0.5;
 
     this.getDistance = this.getDistance.bind(this);
     this.generateNewVertices = this.generateNewVertices.bind(this);
@@ -33,8 +34,8 @@ class App extends Component {
     this.setShowShortestPath = this.setShowShortestPath.bind(this);
   }
 
-  getDistance(p1, p2) {
-    return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+  getDistance(p1, p2, realCoords = false) {
+    return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow((realCoords === true ? 1 : this.HEIGHT_TO_WIDTH_RATIO) * (p1.y - p2.y), 2));
   }
 
   generateNewVertices(n) {
@@ -68,7 +69,7 @@ class App extends Component {
   renderCanvas() {
     let canvas = document.getElementById('canvas');
     let width = canvas.parentElement.clientWidth;
-    let height = parseInt(width / 2, 10);
+    let height = parseInt(width * this.HEIGHT_TO_WIDTH_RATIO, 10);
     let oldWidth = canvas.width;
     let oldHeight = canvas.height;
     if(oldWidth !== width || oldHeight !== height) {
@@ -137,7 +138,7 @@ class App extends Component {
   handleMouseMove(e) {
     let mouseCoords = this.getMouseCoords(e);
     let vertices = this.state.vertices.map(v => {
-      v.hover = this.getDistance(mouseCoords, { x: v.x * this.state.canvasWidth, y: v.y * this.state.canvasHeight }) < this.RADIUS;
+      v.hover = this.getDistance(mouseCoords, { x: v.x * this.state.canvasWidth, y: v.y * this.state.canvasHeight }, true) < this.RADIUS;
       return v;
     });
     this.setState({ vertices });
